@@ -26,6 +26,7 @@ listen/
 enhanced/
 checkpoints/
 baselines/
+data/
 __paths__.py
 *.csv
 *.pdf
