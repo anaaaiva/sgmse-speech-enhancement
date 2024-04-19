@@ -64,6 +64,9 @@ if __name__ == "__main__":
     trainer_parser.add_argument(
         "--accumulate_grad_batches", type=int, default=1, help="Accumulate gradients."
     )
+    trainer_parser.add_argument(
+        "--max_epochs", type=int, default=100, help="Number of max training epochs."
+    )
 
     ScoreModel.add_argparse_args(
         parser.add_argument_group("ScoreModel", description=ScoreModel.__name__)
