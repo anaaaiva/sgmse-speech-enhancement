@@ -166,7 +166,7 @@ class OUVESDE(SDE):
             "--sde-n",
             type=int,
             default=1000,
-            help="The number of timesteps in the SDE discretization. 30 by default",
+            help="The number of timesteps in the SDE discretization. 1000 by default",
         )
         parser.add_argument(
             "--theta",
