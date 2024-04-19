@@ -158,19 +158,19 @@ class ScoreModel(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss = self._step(batch, batch_idx)
-        self.log("train_loss", loss, on_step=True, on_epoch=True)
+        self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
         loss = self._step(batch, batch_idx)
-        self.log("valid_loss", loss, on_step=False, on_epoch=True)
+        self.log("valid_loss", loss)
 
         # Evaluate speech enhancement performance
         if batch_idx == 0 and self.num_eval_files != 0:
             pesq, si_sdr, estoi = evaluate_model(self, self.num_eval_files)
-            self.log("pesq", pesq, on_step=False, on_epoch=True)
-            self.log("si_sdr", si_sdr, on_step=False, on_epoch=True)
-            self.log("estoi", estoi, on_step=False, on_epoch=True)
+            self.log("pesq", pesq)
+            self.log("si_sdr", si_sdr)
+            self.log("estoi", estoi)
 
         return loss
 
