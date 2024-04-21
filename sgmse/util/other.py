@@ -3,11 +3,9 @@ import os
 import numpy as np
 import scipy.stats
 import torch
+from pesq import pesq
+from pystoi import stoi
 from scipy.signal import butter, sosfilt
-from torchmetrics.audio import (
-    PerceptualEvaluationSpeechQuality,
-    ShortTimeObjectiveIntelligibility,
-)
 
 
 def si_sdr_components(s_hat, s, n):
@@ -104,19 +102,16 @@ def ensure_dir(file_path):
 
 
 def print_metrics(x, y, x_hat_list, labels, sr=16000):
-    wb_pesq = PerceptualEvaluationSpeechQuality(sr, "wb")
-    stoi = ShortTimeObjectiveIntelligibility(sr, True)
-
     _si_sdr_mix = si_sdr(x, y)
-    _pesq_mix = wb_pesq(x, y)
-    _estoi_mix = stoi(x, y, sr)
+    _pesq_mix = pesq(sr, x, y, "wb")
+    _estoi_mix = stoi(x, y, sr, extended=True)
     print(
         f"Mixture:  PESQ: {_pesq_mix:.2f}, ESTOI: {_estoi_mix:.2f}, SI-SDR: {_si_sdr_mix:.2f}"
     )
     for i, x_hat in enumerate(x_hat_list):
         _si_sdr = si_sdr(x, x_hat)
-        _pesq = wb_pesq(x, x_hat)
-        _estoi = stoi(x, x_hat, sr)
+        _pesq = pesq(sr, x, x_hat, "wb")
+        _estoi = stoi(x, x_hat, sr, extended=True)
         print(f"{labels[i]}: {_pesq:.2f}, ESTOI: {_estoi:.2f}, SI-SDR: {_si_sdr:.2f}")
 
 

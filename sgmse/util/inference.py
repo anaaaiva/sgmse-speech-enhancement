@@ -1,9 +1,7 @@
 import torch
+from pesq import pesq
+from pystoi import stoi
 from torchaudio import load
-from torchmetrics.audio import (
-    PerceptualEvaluationSpeechQuality,
-    ShortTimeObjectiveIntelligibility,
-)
 
 from .other import pad_spec, si_sdr
 
@@ -27,10 +25,6 @@ def evaluate_model(model, num_eval_files):
     _pesq = 0
     _si_sdr = 0
     _estoi = 0
-
-    wb_pesq = PerceptualEvaluationSpeechQuality(sr, "wb")
-    stoi = ShortTimeObjectiveIntelligibility(sr, True)
-
     # iterate over files
     for clean_file, noisy_file in zip(clean_files, noisy_files):
         # Load wavs
@@ -66,7 +60,7 @@ def evaluate_model(model, num_eval_files):
         y = y.squeeze().cpu().numpy()
 
         _si_sdr += si_sdr(x, x_hat)
-        _pesq += wb_pesq(x, x_hat)
-        _estoi += stoi(x, x_hat, sr)
+        _pesq += pesq(sr, x, x_hat, "wb")
+        _estoi += stoi(x, x_hat, sr, extended=True)
 
     return _pesq / num_eval_files, _si_sdr / num_eval_files, _estoi / num_eval_files
