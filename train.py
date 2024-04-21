@@ -7,7 +7,7 @@ from lightning.pytorch.loggers import WandbLogger
 
 from sgmse.backbones.shared import BackboneRegistry
 from sgmse.data_module import SpecsDataModule
-from sgmse.model import ScoreModel
+from sgmse.model import DiscriminativeModel, ScoreModel
 from sgmse.sdes import SDERegistry
 
 
@@ -42,6 +42,11 @@ if __name__ == "__main__":
         )
         parser_.add_argument(
             "--ckpt", type=str, default=None, help="Resume training from checkpoint."
+        )
+        parser_.add_argument(
+            "--discriminatively",
+            action="store_true",
+            help="Train the backbone as a discriminative model instead",
         )
 
     temp_args, _ = base_parser.parse_known_args()
@@ -86,8 +91,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     arg_groups = get_argparse_groups(parser)
 
+    model_cls = ScoreModel if not temp_args.discriminatively else DiscriminativeModel
     # Initialize logger, trainer, model, datamodule
-    model = ScoreModel(
+    model = model_cls(
         backbone=args.backbone,
         sde=args.sde,
         data_module_cls=data_module_cls,
@@ -96,6 +102,7 @@ if __name__ == "__main__":
             **vars(arg_groups["SDE"]),
             **vars(arg_groups["Backbone"]),
             **vars(arg_groups["DataModule"]),
+            "discriminative": temp_args.discriminatively,
         },
     )
 
