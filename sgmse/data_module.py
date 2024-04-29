@@ -239,7 +239,7 @@ class SpecsDataModule(L.LightningDataModule):
             )
             self.valid_set = Specs(
                 data_dir=self.base_dir,
-                subset="valid",
+                subset="test",
                 dummy=self.dummy,
                 shuffle_spec=False,
                 format=self.format,
