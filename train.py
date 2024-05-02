@@ -4,7 +4,6 @@ from argparse import ArgumentParser
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
-
 from sgmse.backbones.shared import BackboneRegistry
 from sgmse.data_module import SpecsDataModule
 from sgmse.model import DiscriminativeModel, ScoreModel
@@ -147,6 +146,7 @@ if __name__ == "__main__":
     trainer = L.Trainer(
         **vars(arg_groups["Trainer"]),
         strategy="ddp",
+        # DDPStrategy(find_unused_parameters=True),
         logger=logger,
         log_every_n_steps=10,
         num_sanity_val_steps=0,
