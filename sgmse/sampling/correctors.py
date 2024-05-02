@@ -1,8 +1,6 @@
 import abc
 
 import torch
-
-from sgmse import sdes
 from sgmse.util.registry import Registry
 
 CorrectorRegistry = Registry("Corrector")
@@ -62,22 +60,18 @@ class AnnealedLangevinDynamics(Corrector):
 
     def __init__(self, sde, score_fn, snr, n_steps):
         super().__init__(sde, score_fn, snr, n_steps)
-        if not isinstance(sde, (sdes.OUVESDE,)):
-            raise NotImplementedError(
-                f"SDE class {sde.__class__.__name__} not yet supported."
-            )
         self.sde = sde
         self.score_fn = score_fn
         self.snr = snr
         self.n_steps = n_steps
 
-    def update_fn(self, x, t, *args):
+    def update_fn(self, x, t, y):
+        x_mean = 0
         n_steps = self.n_steps
         target_snr = self.snr
-        std = self.sde.marginal_prob(x, t, *args)[1]
-
+        std = self.sde.marginal_prob(x, t, y)[1]
         for _ in range(n_steps):
-            grad = self.score_fn(x, t, *args)
+            grad = self.score_fn(x, t, y)
             noise = torch.randn_like(x)
             step_size = (target_snr * std) ** 2 * 2
             x_mean = x + step_size[:, None, None, None] * grad

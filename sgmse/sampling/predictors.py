@@ -2,7 +2,6 @@ import abc
 
 import numpy as np
 import torch
-
 from sgmse.util.registry import Registry
 
 PredictorRegistry = Registry("Predictor")
@@ -52,18 +51,38 @@ class EulerMaruyamaPredictor(Predictor):
         x = x_mean + g[:, None, None, None] * np.sqrt(-dt) * z
         return x, x_mean
 
+    def update_fn_analyze(self, x, t, *args):
+        dt = -1.0 / self.rsde.N
+        z = torch.randn_like(x)
+        parts = self.rsde.rsde_parts(x, t, *args)
+        # 'total_drift': total_drift, 'diffusion': diffusion, 'sde_drift': sde_drift,
+        # 'sde_diffusion': sde_diffusion, 'score_drift': score_drift, 'score': score,
+        f = parts["total_drift"]
+        g = parts["diffusion"]
+        sde_drift = parts["sde_drift"]
+        score_drift = parts["score_drift"]
+
+        x_mean = x + f * dt
+        x = x_mean + g[:, None, None, None] * np.sqrt(-dt) * z
+        return x, x_mean, sde_drift * dt, score_drift * dt
+
 
 @PredictorRegistry.register("reverse_diffusion")
 class ReverseDiffusionPredictor(Predictor):
     def __init__(self, sde, score_fn, probability_flow=False):
         super().__init__(sde, score_fn, probability_flow=probability_flow)
 
-    def update_fn(self, x, t, *args):
-        f, g = self.rsde.discretize(x, t, *args)
+    def update_fn(self, x, t, y, stepsize):
+        f, g = self.rsde.discretize(x, t, y, stepsize)
         z = torch.randn_like(x)
         x_mean = x - f
         x = x_mean + g[:, None, None, None] * z
         return x, x_mean
+
+    def update_fn_analyze(self, x, t, *args):
+        raise NotImplementedError(
+            "update_fn_analyze() has not been implemented yet for the ReverseDiffusionPredictor"
+        )
 
 
 @PredictorRegistry.register("none")

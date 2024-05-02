@@ -1,6 +1,8 @@
 # Adapted from https://github.com/yang-song/score_sde_pytorch/blob/1618ddea340f3e4a2ed7852a0694a809775cf8d0/sampling.py
 """Various sampling methods."""
 
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from scipy import integrate
 
@@ -31,13 +33,15 @@ def get_pc_sampler(
     corrector_name,
     sde,
     score_fn,
-    y,
+    Y,
+    Y_prior=None,
     denoise=True,
     eps=3e-2,
     snr=0.1,
     corrector_steps=1,
     probability_flow: bool = False,
     intermediate=False,
+    timestep_type=None,
     **kwargs,
 ):
     """Create a Predictor-Corrector (PC) sampler.
@@ -61,31 +65,54 @@ def get_pc_sampler(
     predictor = predictor_cls(sde, score_fn, probability_flow=probability_flow)
     corrector = corrector_cls(sde, score_fn, snr=snr, n_steps=corrector_steps)
 
-    def pc_sampler():
+    def pc_sampler(Y_prior=Y_prior, timestep_type=timestep_type):
         """The PC sampler function."""
         with torch.no_grad():
-            xt = sde.prior_sampling(y.shape, y).to(y.device)
-            timesteps = torch.linspace(sde.T, eps, sde.N, device=y.device)
-            for i in range(sde.N):
+            if Y_prior == None:
+                Y_prior = Y
+
+            xt, _ = sde.prior_sampling(Y_prior.shape, Y_prior)
+            timesteps = timesteps_space(sde.T, sde.N, eps, Y.device, type=timestep_type)
+            xt = xt.to(Y_prior.device)
+            for i in range(len(timesteps)):
                 t = timesteps[i]
-                vec_t = torch.ones(y.shape[0], device=y.device) * t
-                xt, xt_mean = corrector.update_fn(xt, vec_t, y)
-                xt, xt_mean = predictor.update_fn(xt, vec_t, y)
+                if i != len(timesteps) - 1:
+                    stepsize = t - timesteps[i + 1]
+                else:
+                    stepsize = timesteps[-1]
+                vec_t = torch.ones(Y.shape[0], device=Y.device) * t
+                xt, xt_mean = corrector.update_fn(xt, vec_t, Y)
+                xt, xt_mean = predictor.update_fn(xt, vec_t, Y, stepsize)
             x_result = xt_mean if denoise else xt
-            ns = sde.N * (corrector.n_steps + 1)
+            ns = len(timesteps) * (corrector.n_steps + 1)
             return x_result, ns
 
+    # if intermediate:
+    #     return pc_sampler_intermediate
+    # else:
     return pc_sampler
+
+
+def timesteps_space(sdeT, sdeN, eps, device, type="linear"):
+    timesteps = torch.linspace(sdeT, eps, sdeN, device=device)
+    if type == "linear":
+        return timesteps
+    else:
+        pass  # not used, can be used to implement different sampling schedules
+
+    return timesteps
 
 
 def get_ode_sampler(
     sde,
     score_fn,
     y,
+    Y_prior=None,
     inverse_scaler=None,
     denoise=True,
     rtol=1e-5,
     atol=1e-5,
+    timestep_type=None,
     method="RK45",
     eps=3e-2,
     device="cuda",
@@ -114,14 +141,14 @@ def get_ode_sampler(
 
     def denoise_update_fn(x):
         vec_eps = torch.ones(x.shape[0], device=x.device) * eps
-        _, x = predictor.update_fn(x, vec_eps, y)
+        _, x = predictor.update_fn(x, vec_eps, y, 0.03)
         return x
 
     def drift_fn(x, t, y):
         """Get the drift function of the reverse-time SDE."""
         return rsde.sde(x, t, y)[0]
 
-    def ode_sampler(z=None, **kwargs):
+    def ode_sampler(z=None, Y_prior=Y_prior, **kwargs):
         """The probability flow ODE sampler with black-box ODE solver.
 
         Args:
@@ -132,7 +159,12 @@ def get_ode_sampler(
         """
         with torch.no_grad():
             # If not represent, sample the latent code from the prior distibution of the SDE.
-            x = sde.prior_sampling(y.shape, y).to(device)
+
+            if Y_prior == None:
+                Y_prior = y
+
+            xt, _ = sde.prior_sampling(Y_prior.shape, Y_prior)
+            x = xt.to(Y_prior.device)
 
             def ode_func(t, x):
                 x = from_flattened_numpy(x, y.shape).to(device).type(torch.complex64)
