@@ -30,6 +30,7 @@ class Specs(Dataset):
         normalize="noisy",
         spec_transform=None,
         stft_kwargs=None,
+        return_time=False,
         **ignored_kwargs,
     ):
         # Read file paths according to file naming format.
@@ -40,7 +41,6 @@ class Specs(Dataset):
             self.clean_files = sorted(glob(join(data_dir, subset) + "/anechoic/*.wav"))
             self.noisy_files = sorted(glob(join(data_dir, subset) + "/reverb/*.wav"))
         else:
-            # Feel free to add your own directory format
             raise NotImplementedError(f"Directory format {format} unknown!")
 
         self.dummy = dummy
@@ -48,6 +48,7 @@ class Specs(Dataset):
         self.shuffle_spec = shuffle_spec
         self.normalize = normalize
         self.spec_transform = spec_transform
+        self.return_time = return_time
 
         assert all(
             k in stft_kwargs.keys() for k in ["n_fft", "hop_length", "center", "window"]
@@ -89,6 +90,9 @@ class Specs(Dataset):
             normfac = 1.0
         x = x / normfac
         y = y / normfac
+
+        if self.return_time:
+            return x, y
 
         X = torch.stft(x, **self.stft_kwargs)
         Y = torch.stft(y, **self.stft_kwargs)
@@ -182,6 +186,12 @@ class SpecsDataModule(L.LightningDataModule):
             default="exponent",
             help="Spectogram transformation for input representation.",
         )
+        parser.add_argument(
+            "--return_time",
+            action="store_true",
+            help="Return the waveform instead of the STFT",
+        )
+
         return parser
 
     def __init__(
@@ -200,6 +210,7 @@ class SpecsDataModule(L.LightningDataModule):
         gpu=True,
         normalize="noisy",
         transform_type="exponent",
+        return_time=False,
         **kwargs,
     ):
         super().__init__()
@@ -219,6 +230,7 @@ class SpecsDataModule(L.LightningDataModule):
         self.normalize = normalize
         self.transform_type = transform_type
         self.kwargs = kwargs
+        self.return_time = return_time
 
     def setup(self, stage=None):
         specs_kwargs = dict(
@@ -234,16 +246,16 @@ class SpecsDataModule(L.LightningDataModule):
                 dummy=self.dummy,
                 shuffle_spec=True,
                 format=self.format,
-                normalize=self.normalize,
+                return_time=self.return_time,
                 **specs_kwargs,
             )
             self.valid_set = Specs(
                 data_dir=self.base_dir,
-                subset="test",
+                subset="valid",
                 dummy=self.dummy,
                 shuffle_spec=False,
                 format=self.format,
-                normalize=self.normalize,
+                return_time=self.return_time,
                 **specs_kwargs,
             )
         if stage == "test" or stage is None:
@@ -253,7 +265,7 @@ class SpecsDataModule(L.LightningDataModule):
                 dummy=self.dummy,
                 shuffle_spec=False,
                 format=self.format,
-                normalize=self.normalize,
+                return_time=self.return_time,
                 **specs_kwargs,
             )
 
