@@ -4,12 +4,13 @@ from math import ceil
 
 import lightning as L
 import torch
+from torch_ema import ExponentialMovingAverage
+
 from sgmse import sampling
 from sgmse.backbones import BackboneRegistry
 from sgmse.sdes import SDERegistry
 from sgmse.util.inference import evaluate_model
 from sgmse.util.other import pad_spec
-from torch_ema import ExponentialMovingAverage
 
 
 class ScoreModel(L.LightningModule):
@@ -460,7 +461,7 @@ class DiscriminativeModel(ScoreModel):
             x_hat = self.to_audio(X_hat.squeeze(), T_orig)
         x_hat = x_hat * norm_factor
 
-        x_hat = x_hat.cpu().numpy()
+        x_hat = x_hat.cpu().detach().numpy()
         end = time.time()
         if timeit:
             rtf = (end - start) / (len(x_hat) / sr)
