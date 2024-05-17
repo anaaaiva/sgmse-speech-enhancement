@@ -2,13 +2,13 @@ from argparse import ArgumentParser
 from glob import glob
 from os.path import join
 
-import torch
+import torchaudio.transforms as T
 from soundfile import write
 from torchaudio import load
 from tqdm import tqdm
 
-from sgmse.model import ScoreModel
-from sgmse.util.other import ensure_dir, pad_spec
+from sgmse.model import DiscriminativeModel, ScoreModel
+from sgmse.util.other import ensure_dir
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -42,6 +42,11 @@ if __name__ == "__main__":
         help="SNR value for (annealed) Langevin dynmaics.",
     )
     parser.add_argument("--N", type=int, default=30, help="Number of reverse steps")
+    parser.add_argument(
+        "--discriminatively",
+        action="store_true",
+        help="Use a discriminative model instead",
+    )
     args = parser.parse_args()
 
     noisy_dir = join(args.test_dir, "noisy/")
@@ -57,13 +62,9 @@ if __name__ == "__main__":
     N = args.N
     corrector_steps = args.corrector_steps
 
-    # Load score model
-    model = ScoreModel.load_from_checkpoint(
-        checkpoint_file,
-        base_dir="",
-        batch_size=16,
-        num_workers=0,
-        kwargs=dict(gpu=False),
+    model_cls = ScoreModel if not args.discriminatively else DiscriminativeModel
+    model = model_cls.load_from_checkpoint(
+        args.ckpt, base_dir="", batch_size=8, kwargs=dict(gpu=False), num_workers=0
     )
     model.eval(no_ema=False)
     model.cuda()
@@ -74,33 +75,19 @@ if __name__ == "__main__":
         filename = noisy_file.split("/")[-1]
 
         # Load wav
-        y, _ = load(noisy_file)
-        T_orig = y.size(1)
-
-        # Normalize
-        norm_factor = y.abs().max()
-        y = y / norm_factor
-
-        # Prepare DNN input
-        Y = torch.unsqueeze(model._forward_transform(model._stft(y.cuda())), 0)
-        Y = pad_spec(Y)
-
-        # Reverse sampling
-        sampler = model.get_pc_sampler(
-            "reverse_diffusion",
-            corrector_cls,
-            Y.cuda(),
-            N=N,
-            corrector_steps=corrector_steps,
-            snr=snr,
+        y, sr = load(noisy_file)
+        if sr != 16000:
+            resampler = T.Resample(orig_freq=sr, new_freq=16000)
+            y = resampler(y)
+            sr = 16000
+        assert sr == 16000, "Pretrained models worked wth sampling rate of 16000"
+        x_hat = model.enhance(
+            y,
+            corrector=args.corrector,
+            N=args.N,
+            corrector_steps=args.corrector_steps,
+            snr=args.snr,
         )
-        sample, _ = sampler()
-
-        # Backward transform in time domain
-        x_hat = model.to_audio(sample.squeeze(), T_orig)
-
-        # Renormalize
-        x_hat = x_hat * norm_factor
 
         # Write enhanced wav file
-        write(join(target_dir, filename), x_hat.cpu().numpy(), 16000)
+        write(join(target_dir, filename), x_hat, sr)
