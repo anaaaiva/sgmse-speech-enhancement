@@ -7,7 +7,7 @@ This repository contains the NONOFFICIAL PyTorch reimplementation for the 2023 p
 - [*Speech Enhancement and Dereverberation with Diffusion-Based Generative Models*](https://arxiv.org/abs/2208.05830), 2022 [1]
 - [*Analysing Diffusion-based Generative Approaches versus Discriminative Approaches for Speech Restoration*](https://arxiv.org/abs/2211.02397), 2023 [2]
 
-I trained model on open source VoiceBank+Demand dataset, made some experiments with generative/discriminative methods and writed about it in my graduation work, pdf version of which could be founded in folder `pdf_thesis`. As for the code, I resolved some conflicts in new versions of libraries for 3.10 version of Python, fixed codestyle with formatter for readability and made changes, bringing different approaches together.
+I trained model on open source VoiceBank+Demand dataset, made some experiments with generative/discriminative methods and writed about it in my graduation work, pdf version of which could be founded in folder `pdf_thesis`. As for the code, I made some changes, bringing different approaches together (OUVE/BBED/Discriminative and other), resolved some conflicts in new versions of libraries for 3.10 version of Python, fixed codestyle with formatter for readability.
 
 ## Installation
 
